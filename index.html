@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carga de caja – San Martín</title>
+<style>
+  :root { --bg:#fafafa; --fg:#1a1a1a; --mute:#666; --line:#ddd; --card:#fff; --ok:#1b7f3b; --bad:#b3261e; --badbg:#fdecea; --btn:#1a1a1a; --go:#16a34a; --go-fg:#fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161616; --fg:#eee; --mute:#999; --line:#333; --card:#1f1f1f; --ok:#5fcf80; --bad:#ff8a80; --badbg:#3a1f1c; --btn:#eee; --go:#22c55e; --go-fg:#04210f; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.4 system-ui,sans-serif; }
+  main { max-width:980px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:20px; margin:0 0 4px; } p.sub { margin:0 0 20px; color:var(--mute); }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  @media (max-width:760px) { .cols { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; }
+  label { display:block; font-size:14px; color:var(--mute); margin-bottom:6px; }
+  input[type=password] { width:100%; padding:10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; }
+  .hide { display:none !important; } a { color:inherit; } .gap { height:14px; }
+
+  /* Acciones (izquierda) */
+  .pdf-btn { display:block; text-align:center; padding:22px 16px; font-size:18px; font-weight:700; color:var(--bg); background:var(--btn); border-radius:10px; cursor:pointer; margin:0; }
+  .pdf-btn:hover { opacity:.85; }
+  .lista { margin-top:12px; }
+  .arch { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--line); border-radius:6px; margin-top:8px; }
+  .arch.err { border-color:var(--bad); background:var(--badbg); }
+  .arch .info { flex:1; min-width:0; }
+  .arch .nom { font-size:14px; font-weight:600; word-break:break-all; }
+  .arch .det { font-size:13px; color:var(--mute); margin-top:2px; }
+  .arch .det.ok { color:var(--ok); } .arch .det.bad { color:var(--bad); }
+  .del { flex:none; width:32px; height:32px; border:1px solid var(--line); border-radius:6px; background:transparent; color:var(--fg); font-size:16px; cursor:pointer; line-height:1; }
+  .del:hover { border-color:var(--bad); color:var(--bad); } .del:disabled { opacity:.3; cursor:default; }
+  .msg { margin-top:12px; min-height:1.4em; font-size:15px; } .ok { color:var(--ok); } .bad { color:var(--bad); }
+  .go-btn { display:block; width:100%; margin-top:18px; padding:22px 16px; font:inherit; font-size:19px; font-weight:800; letter-spacing:.2px;
+    color:var(--go-fg); background:var(--go); border:0; border-radius:10px; cursor:pointer; }
+  .go-btn:hover:not(:disabled) { filter:brightness(1.08); } .go-btn:disabled { opacity:.35; cursor:default; }
+
+  /* Avisos temporales (desaparecen solos) */
+  .toasts { position:fixed; top:16px; right:16px; z-index:50; display:flex; flex-direction:column; gap:8px; width:min(420px, calc(100vw - 32px)); }
+  .toast { position:relative; overflow:hidden; display:flex; gap:10px; align-items:flex-start; padding:12px 14px; border-radius:8px; font-size:14px;
+    background:var(--badbg); color:var(--bad); border:1px solid var(--bad); box-shadow:0 4px 14px rgba(0,0,0,.18); transition:opacity .4s, transform .4s; }
+  .toast.out { opacity:0; transform:translateX(12px); }
+  .toast .t { flex:1; word-break:break-word; }
+  .toast button { flex:none; background:transparent; border:0; color:inherit; font-size:16px; line-height:1; cursor:pointer; padding:0 2px; }
+  .toast::after { content:''; position:absolute; left:0; bottom:0; height:3px; width:100%; background:currentColor; opacity:.5; animation:resta var(--ms) linear forwards; }
+  @keyframes resta { to { width:0; } }
+
+  /* Asistente (chat con preguntas predefinidas) */
+  .chat-btn { position:fixed; right:18px; bottom:18px; z-index:40; width:56px; height:56px; border-radius:50%; border:0; background:var(--btn); color:var(--bg); font-size:26px; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.25); padding:0; }
+  .chat { position:fixed; right:18px; bottom:86px; z-index:40; width:min(360px, calc(100vw - 36px)); max-height:min(520px, calc(100vh - 110px)); display:flex; flex-direction:column;
+    background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 28px rgba(0,0,0,.25); overflow:hidden; }
+  .chat-head { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid var(--line); }
+  .chat-head button { background:transparent; border:0; color:var(--fg); font-size:16px; cursor:pointer; }
+  .chat-msgs { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; font-size:14px; }
+  .bub { max-width:88%; padding:8px 11px; border-radius:12px; word-break:break-word; }
+  .bub.bot { align-self:flex-start; background:var(--bg); border:1px solid var(--line); }
+  .bub.yo { align-self:flex-end; background:var(--btn); color:var(--bg); }
+  .chat-qs { display:flex; flex-direction:column; gap:6px; padding:10px 12px; border-top:1px solid var(--line); }
+  .chat-qs button { text-align:left; background:transparent; color:var(--fg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; font-size:14px; cursor:pointer; }
+  .chat-qs button:hover { border-color:var(--fg); } .chat-qs button:disabled { opacity:.5; cursor:default; }
+  .bub .chip { font-size:12px; margin:2px 3px 2px 0; }
+
+  /* Historial */
+  .abajo { margin-top:16px; }
+  .warn { color:#b45309; } @media (prefers-color-scheme: dark) { .warn { color:#fbbf24; } }
+  .chip { display:inline-block; padding:2px 9px; margin:3px 4px 3px 0; border:1px solid var(--line); border-radius:999px; font-size:13px; }
+  .mes { margin-top:10px; font-size:14px; } .mes b { display:inline-block; min-width:90px; }
+  select { padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; font-size:14px; }
+  .log-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .mini { background:transparent; color:var(--mute); border:1px solid var(--line); border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; cursor:pointer; }
+  .mini:hover { color:var(--fg); }
+  .log table { font-size:13px; } .log td, .log th { text-align:left; vertical-align:top; } .log td.r { word-break:break-word; }
+  .log .vacio { color:var(--mute); font-size:14px; }
+
+  /* Resumen (derecha, más chico) */
+  .resumen { font-size:15px; }
+  .resumen .vacio { color:var(--mute); text-align:center; padding:24px 0; }
+  .fecha-grande { font-size:30px; font-weight:800; line-height:1.15; }
+  .fecha-dia { font-size:15px; color:var(--mute); margin:0 0 10px; text-transform:capitalize; }
+  table { width:100%; border-collapse:collapse; font-size:15px; }
+  td, th { padding:7px 4px; border-bottom:1px solid var(--line); text-align:right; } th:first-child, td:first-child { text-align:left; }
+  th { font-size:13px; color:var(--mute); font-weight:600; } tr.total td { font-weight:700; border-bottom:0; }
+</style>
+</head>
+<body>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<button id="chatBtn" class="chat-btn" aria-label="Abrir asistente" title="Asistente">💬</button>
+<div id="chat" class="chat hide" role="dialog" aria-label="Asistente de cargas">
+  <div class="chat-head"><strong>Asistente</strong><button id="chatX" aria-label="Cerrar asistente">✕</button></div>
+  <div id="chatMsgs" class="chat-msgs"></div>
+  <div id="chatQs" class="chat-qs"></div>
+</div>
+<main>
+  <h1>Carga de caja</h1>
+  <p class="sub">Carnicería y Verdulería San Martín · subí uno o varios PDF “Listado de Movimientos de la Caja”</p>
+
+  <div class="cols">
+    <!-- Izquierda: acciones -->
+    <div class="card">
+      <label for="codigo">Código de acceso</label>
+      <input id="codigo" type="password" autocomplete="off">
+      <div class="gap"></div>
+      <input id="pdf" type="file" accept="application/pdf" multiple class="hide">
+      <label for="pdf" class="pdf-btn" id="pdfBtn">Subir PDF de caja</label>
+      <div id="lista" class="lista"></div>
+      <div id="aviso" class="msg"></div>
+      <button id="subir" class="go-btn" disabled>Subir al Sheet</button>
+      <div id="estado" class="msg"></div>
+    </div>
+
+    <!-- Derecha: resumen -->
+    <div class="card resumen" id="resumen"></div>
+  </div>
+
+  <!-- Historial de subidas (log de ejecución) -->
+  <div class="card log abajo">
+    <div class="log-head"><strong>Historial de subidas</strong><button id="limpiarLog" class="mini">Borrar historial</button></div>
+    <div id="log"></div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="parser.js"></script>
+<script>
+  // Estos dos valores los inyecta `node build.js` desde las variables de entorno (.env local o secrets del host).
+  const SCRIPT_URL = '__SCRIPT_URL__';
+  const SHEET_URL  = '__SHEET_URL__';
+  const SCRIPT_OK  = !!SCRIPT_URL && !SCRIPT_URL.startsWith('__'); // false si se abre la plantilla sin hacer el build
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const $ = id => document.getElementById(id);
+  const peso = n => new Intl.NumberFormat('es-AR', { style:'currency', currency:'ARS' }).format(n);
+  const fechaAR = iso => iso.split('-').reverse().join('/');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  const dia = f => { const [y, m, d] = f.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('es-AR', { weekday:'long' }); };
+
+  // Cada archivo: { id, key, name, dias, control, error, estado, detalle, ocupado }
+  let archivos = [], seq = 0, subiendo = false, historial = [];
+  const sesion = []; // subidas hechas desde que se abrió la página
+  let ultimoError = ''; // motivo del último fallo al leer el Sheet
+  const cargadas = {}; // año -> Set de fechas (yyyy-mm-dd) que ya tienen datos en el Sheet
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const anioActual = new Date().getFullYear();
+
+  // Lee del Sheet qué fechas del año ya tienen datos
+  async function cargarFechas(anio, avisar) {
+    const codigo = $('codigo').value.trim();
+    if (!codigo || !SCRIPT_OK) { ultimoError = 'falta el código de acceso'; return; }
+    try {
+      ultimoError = '';
+      const r = await fetch(SCRIPT_URL, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify({ codigo, accion:'cargados', anio }) });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error);
+      cargadas[anio] = new Set(j.fechas);
+    } catch (e) { ultimoError = e.message; if (avisar) toast('No pude leer las fechas del Sheet (' + anio + '): ' + e.message); }
+    render();
+  }
+  $('codigo').addEventListener('change', () => cargarFechas(anioActual, true));
+  try { historial = JSON.parse(localStorage.getItem('historial') || '[]').filter(e => e.ok); } catch (e) {} // solo subidas exitosas
+
+  // Aviso que se cierra solo a los 15 segundos (o con la ✕)
+  function toast(msg, ms = 15000) {
+    const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'alert'); el.style.setProperty('--ms', ms + 'ms');
+    const t = document.createElement('div'); t.className = 't'; t.textContent = '⛔ ' + msg;
+    const x = document.createElement('button'); x.textContent = '✕'; x.setAttribute('aria-label', 'Cerrar aviso');
+    const quitar = () => { clearTimeout(timer); el.classList.add('out'); setTimeout(() => el.remove(), 400); };
+    const timer = setTimeout(quitar, ms); x.onclick = quitar;
+    el.append(t, x); $('toasts').appendChild(el);
+  }
+
+  function logear(e) {
+    historial.unshift(Object.assign({ ts: Date.now() }, e));
+    historial = historial.slice(0, 200);
+    try { localStorage.setItem('historial', JSON.stringify(historial)); } catch (_) {}
+    renderLog();
+  }
+  function renderLog() {
+    if (!historial.length) { $('log').innerHTML = '<div class="vacio">Todavía no hay subidas registradas.</div>'; return; }
+    const fh = ts => new Date(ts).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+    $('log').innerHTML = '<table><thead><tr><th>Fecha y hora</th><th>Archivo</th><th>Día(s)</th><th>Resultado</th></tr></thead><tbody>' +
+      historial.map(e => '<tr><td>' + fh(e.ts) + '</td><td>' + esc(e.archivo) + '</td><td>' + esc(e.fechas || '–') + '</td>' +
+        '<td class="r ' + (e.ok ? 'ok' : 'bad') + '">' + (e.ok ? '✓ ' : '✗ ') + esc(e.detalle) + '</td></tr>').join('') + '</tbody></table>';
+  }
+  $('limpiarLog').addEventListener('click', () => { historial = []; try { localStorage.removeItem('historial'); } catch (_) {} renderLog(); });
+
+  try { $('codigo').value = localStorage.getItem('codigo') || ''; } catch (e) {}
+
+  /* ---------- Agregar / eliminar ---------- */
+  $('pdf').addEventListener('change', async ev => {
+    const files = Array.from(ev.target.files); ev.target.value = ''; // permite volver a elegir el mismo archivo
+    for (const f of files) {
+      const key = f.name + '|' + f.size + '|' + f.lastModified;
+      if (archivos.some(a => a.key === key)) { toast('“' + f.name + '”: ya está en la lista.'); continue; }
+      setMsg('estado', 'Leyendo “' + f.name + '”…');
+      const a = { id: ++seq, key, name: f.name, dias: [], control: null, error: null, estado: 'listo', detalle: '' };
+      try { Object.assign(a, await leer(f)); } catch (e) { a.error = e.message; toast('“' + f.name + '”: ' + e.message); }
+      if (!a.error) { // si alguna fecha ya está en otro archivo de la lista, NO se adjunta
+        const choques = a.dias.map(d => ({ d, otro: archivos.find(x => !x.error && x.dias.some(y => y.fecha === d.fecha)) })).filter(c => c.otro);
+        if (choques.length) {
+          const motivo = 'la fecha ' + choques.map(c => fechaAR(c.d.fecha) + ' ya está en “' + c.otro.name + '”').join(', ');
+          toast('“' + f.name + '” rechazado: ' + motivo + '.');
+          continue;
+        }
+      }
+      archivos.push(a); render();
+      new Set(a.dias.map(d => Number(d.fecha.slice(0, 4)))).forEach(y => { if (!cargadas[y]) cargarFechas(y, false); });
+    }
+    setMsg('estado', '');
+    render();
+  });
+
+  $('lista').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-del]'); if (!b || subiendo) return;
+    archivos = archivos.filter(a => a.id !== Number(b.dataset.del));
+    setMsg('estado', ''); render();
+  });
+
+  async function leer(f) {
+    const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await f.arrayBuffer()) }).promise;
+    const pages = [];
+    for (let p = 1; p <= doc.numPages; p++) {
+      const tc = await (await doc.getPage(p)).getTextContent();
+      pages.push(tc.items.map(i => ({ str: i.str, x: i.transform[4], y: i.transform[5] })));
+    }
+    const r = parseCaja(pages);
+    if (!r.dias.length) throw new Error('No encontré movimientos en el PDF.');
+    return { dias: r.dias, control: r.control };
+  }
+
+  /* ---------- Validaciones ---------- */
+  function repetidas() { // fecha -> [archivos que la traen] (solo las que aparecen en más de un archivo)
+    const m = {};
+    archivos.filter(a => !a.error).forEach(a => a.dias.forEach(d => (m[d.fecha] = m[d.fecha] || []).push(a)));
+    return Object.fromEntries(Object.entries(m).filter(([, v]) => v.length > 1));
+  }
+  const ya = a => a.dias.filter(d => cargadas[Number(d.fecha.slice(0, 4))] && cargadas[Number(d.fecha.slice(0, 4))].has(d.fecha));
+  const coincide = a => {
+    const c = a.control, sEf = a.dias.reduce((s, x) => s + x.efectivo, 0), sTj = a.dias.reduce((s, x) => s + x.tdebito + x.tcredito, 0);
+    return (c.ventasEfectivo == null || Math.abs(c.ventasEfectivo - sEf) < 0.01) && (c.tarjetas == null || Math.abs(c.tarjetas - sTj) < 0.01);
+  };
+
+  /* ---------- Pantalla ---------- */
+  function render() {
+    const rep = repetidas(), enRep = new Set(Object.values(rep).flat().map(a => a.id));
+
+    $('lista').innerHTML = archivos.map(a => {
+      let det = '', cls = '', err = false;
+      if (a.error) { det = a.error; cls = 'bad'; err = true; }
+      else if (!a.dias.length) det = 'Leyendo…';
+      else {
+        const fechas = a.dias.map(d => fechaAR(d.fecha)).join(' · ');
+        const reps = a.dias.filter(d => rep[d.fecha]).map(d => fechaAR(d.fecha));
+        if (reps.length) { det = fechas + ' — fecha repetida en otro archivo'; cls = 'bad'; err = true; }
+        else if (a.estado === 'listo' && ya(a).length) { det = '⚠ ' + fechas + ' — esa fecha ya está cargada en el Sheet (se va a sobreescribir)'; cls = 'warn'; }
+        else if (a.estado === 'cargado') { det = '✓ ' + fechas + ' — ' + a.detalle; cls = 'ok'; }
+        else if (a.estado === 'subiendo') det = fechas + ' — subiendo…';
+        else if (a.estado === 'error') { det = fechas + ' — ' + a.detalle; cls = 'bad'; err = true; }
+        else if (!coincide(a)) { det = '⚠ ' + fechas + ' — los totales NO coinciden con el resumen del PDF'; cls = 'bad'; }
+        else { det = '✓ ' + fechas + ' — coincide con el resumen del PDF'; cls = 'ok'; }
+      }
+      return '<div class="arch' + (err ? ' err' : '') + '"><div class="info"><div class="nom">📄 ' + esc(a.name) + '</div>' +
+        '<div class="det ' + cls + '">' + esc(det) + '</div></div>' +
+        '<button class="del" data-del="' + a.id + '" title="Eliminar archivo" aria-label="Eliminar ' + esc(a.name) + '"' + (subiendo ? ' disabled' : '') + '>✕</button></div>';
+    }).join('');
+
+    $('pdfBtn').textContent = archivos.length ? 'Agregar más PDFs' : 'Subir PDF de caja';
+
+    // Aviso de repetidas: bloquea la carga
+    const fr = Object.keys(rep).sort();
+    if (fr.length) {
+      $('aviso').className = 'msg bad';
+      $('aviso').textContent = '⛔ No se puede subir: hay fechas repetidas (' + fr.map(fechaAR).join(', ') + '). Eliminá los archivos duplicados.';
+    } else { setMsg('aviso', ''); }
+
+    const pend = archivos.filter(a => !a.error && a.dias.length && a.estado !== 'cargado');
+    const bloqueado = fr.length || archivos.some(a => a.error) || !pend.length || subiendo;
+    $('subir').disabled = !!bloqueado;
+    $('subir').textContent = pend.length > 1 ? 'Subir ' + pend.length + ' archivos al Sheet' : 'Subir al Sheet';
+
+    resumen(archivos.filter(a => !a.error && a.dias.length && !enRep.has(a.id)));
+  }
+
+  function resumen(lista) {
+    const d = lista.flatMap(a => a.dias).sort((x, y) => x.fecha.localeCompare(y.fecha));
+    if (!d.length) { $('resumen').innerHTML = '<div class="vacio">El resumen del PDF va a aparecer acá.</div>'; return; }
+    let h;
+    if (d.length === 1) { // un solo día: detalle por tipo
+      const x = d[0];
+      const filas = [['Cant. de ventas','cantVentas',true],['Efectivo','efectivo'],['Tarjeta débito','tdebito'],['Tarjeta crédito','tcredito'],
+        ['Cheque','cheque'],['Transferencia','transf'],['TOTAL DEL DÍA','total'],['Factura A','facA'],['Factura B','facB'],
+        ['Orden de pedido','orden'],['Otros','otros'],['Inicio de caja','inicio'],['Salidas','salidas']];
+      h = '<div class="fecha-grande">' + fechaAR(x.fecha) + '</div><div class="fecha-dia">' + dia(x.fecha) + '</div><table><tbody>';
+      filas.forEach(([t, k, cant]) => {
+        if (!cant && k !== 'total' && !x[k]) return;
+        h += '<tr' + (k === 'total' ? ' class="total"' : '') + '><td>' + t + '</td><td>' + (cant ? x[k] : peso(x[k])) + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    } else { // varios días: una fila por día
+      const suma = k => d.reduce((s, x) => s + x[k], 0);
+      h = '<div class="fecha-grande">' + d.length + ' días</div><div class="fecha-dia">' + fechaAR(d[0].fecha) + ' → ' + fechaAR(d[d.length - 1].fecha) + '</div>' +
+        '<table><thead><tr><th>Fecha</th><th>Ventas</th><th>Efectivo</th><th>Tarjeta</th><th>Total</th></tr></thead><tbody>';
+      d.forEach(x => { h += '<tr><td>' + fechaAR(x.fecha) + '</td><td>' + x.cantVentas + '</td><td>' + peso(x.efectivo) + '</td><td>' + peso(x.tdebito + x.tcredito) + '</td><td>' + peso(x.total) + '</td></tr>'; });
+      h += '<tr class="total"><td>TOTAL</td><td>' + suma('cantVentas') + '</td><td>' + peso(suma('efectivo')) + '</td><td>' + peso(suma('tdebito') + suma('tcredito')) + '</td><td>' + peso(suma('total')) + '</td></tr></tbody></table>';
+    }
+    $('resumen').innerHTML = h;
+  }
+
+  /* ---------- Subida en loop ---------- */
+  $('subir').addEventListener('click', async () => {
+    const codigo = $('codigo').value.trim();
+    if (!SCRIPT_OK) return toast('Falta configurar SCRIPT_URL (variable de entorno; ver README).');
+    if (!codigo) return toast('Ingresá el código de acceso.');
+    // Se revalida justo antes de subir: con fechas repetidas no se sube nada
+    const rep = Object.keys(repetidas());
+    if (rep.length) { render(); return toast('Carga rechazada: fechas repetidas (' + rep.map(fechaAR).join(', ') + ').'); }
+    const pend = archivos.filter(a => !a.error && a.dias.length && a.estado !== 'cargado');
+    if (!pend.length) return;
+
+    subiendo = true; setMsg('estado', ''); let ok = 0, ultimaUrl = SHEET_URL, cortar = false;
+    for (const a of pend) {
+      a.estado = 'subiendo'; render();
+      try {
+        const r = await fetch(SCRIPT_URL, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify({ codigo, dias: a.dias }) });
+        const j = await r.json();
+        if (!j.ok) { if (/código/i.test(j.error)) cortar = true; throw new Error(j.error); }
+        a.estado = 'cargado'; a.detalle = 'cargado en ' + j.resultado.map(x => 'hoja ' + x.hoja + ', fila ' + x.fila).join('; ');
+        logear({ archivo: a.name, fechas: a.dias.map(d => fechaAR(d.fecha)).join(' · '), ok: true, detalle: 'Cargado en ' + j.resultado.map(x => 'hoja ' + x.hoja + ', fila ' + x.fila).join('; ') });
+        ultimaUrl = j.resultado[0].url || ultimaUrl; ok++;
+        sesion.push({ archivo: a.name, fechas: a.dias.map(d => d.fecha), ts: Date.now() });
+        try { localStorage.setItem('codigo', codigo); } catch (e) {}
+      } catch (e) { a.estado = 'error'; a.detalle = 'Error: ' + e.message; toast('“' + a.name + '”: ' + e.message); }
+      render(); if (cortar) break;
+    }
+    const anios = new Set(pend.filter(a => a.estado === 'cargado').flatMap(a => a.dias.map(d => Number(d.fecha.slice(0, 4)))));
+    subiendo = false;
+    anios.forEach(y => cargarFechas(y, false));
+    archivos = archivos.filter(a => a.estado !== 'cargado'); // limpia lo ya subido (queda en el historial)
+    render();
+    const fallos = pend.filter(a => a.estado === 'error').length;
+    if (fallos) toast(fallos + ' archivo' + (fallos > 1 ? 's' : '') + ' con error: quedaron en la lista para que los elimines o reintentes.');
+    const est = $('estado');
+    est.className = 'msg ok';
+    est.innerHTML = ok ? '✓ ' + ok + ' archivo' + (ok > 1 ? 's' : '') + ' cargado' + (ok > 1 ? 's' : '') + '. <a href="' + esc(ultimaUrl) + '" target="_blank" rel="noopener">Ver Sheet</a>' : '';
+  });
+
+  /* ---------- Asistente: preguntas predefinidas, sin IA ---------- */
+  const DIAS_C = ['dom','lun','mar','mié','jue','vie','sáb'];
+  const p2 = n => (n < 10 ? '0' : '') + n;
+  const chips = arr => arr.map(t => '<span class="chip">' + esc(t) + '</span>').join('');
+  const PREGUNTAS = [
+    { t: '¿Qué días de este mes faltan cargar?', f: () => faltan(0) },
+    { t: '¿Qué días del mes pasado faltan cargar?', f: () => faltan(-1) },
+    { t: '¿Qué fechas se cargaron en esta sesión?', f: async () => {
+        if (!sesion.length) return 'Todavía no subiste nada en esta sesión.';
+        return 'En esta sesión cargaste:<br>' + sesion.map(s => '• <b>' + esc(s.fechas.map(fechaAR).join(' · ')) + '</b> <span style="color:var(--mute)">(' + esc(s.archivo) + ', ' +
+          new Date(s.ts).toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit', hour12:false }) + ')</span>').join('<br>');
+      } },
+    { t: '¿Cuál es la última fecha cargada?', f: async () => {
+        const anio = new Date().getFullYear();
+        if (!(await asegurar(anio))) return SIN_SHEET_F();
+        const f = Array.from(cargadas[anio]).sort().pop();
+        return f ? 'La última fecha cargada en ' + anio + ' es el <b>' + fechaAR(f) + '</b> (' + dia(f) + ').' : 'Todavía no hay fechas cargadas en ' + anio + '.';
+      } }
+  ];
+  const motivo = () => {
+    const e = ultimoError;
+    if (/falta el código/.test(e)) return 'falta ingresar el código de acceso.';
+    if (/código de acceso incorrecto/i.test(e)) return 'el código de acceso es incorrecto.';
+    if (/No hay días/.test(e)) return 'el script de Google todavía es la versión vieja: falta pegar la función cargados_ y publicar una versión nueva (Implementar > Administrar implementaciones > Nueva versión).';
+    if (/Failed to fetch|NetworkError|Load failed/i.test(e)) return 'no pude conectar con el script de Google (revisá que la implementación tenga acceso "Cualquier usuario").';
+    return e ? esc(e) : 'error desconocido.';
+  };
+  const SIN_SHEET_F = () => 'No pude consultar el Sheet: ' + motivo();
+
+  async function asegurar(anio) { // se asegura de tener leídas del Sheet las fechas de ese año
+    if (!cargadas[anio]) await cargarFechas(anio, false);
+    return !!cargadas[anio];
+  }
+  async function faltan(delta) {
+    const hoy = new Date(), ref = new Date(hoy.getFullYear(), hoy.getMonth() + delta, 1);
+    const y = ref.getFullYear(), m = ref.getMonth() + 1, n = new Date(y, m, 0).getDate();
+    if (!(await asegurar(y))) return SIN_SHEET_F();
+    // En el mes en curso solo cuentan los días ya pasados (la caja de hoy se cierra a la noche)
+    const hasta = delta === 0 ? hoy.getDate() - 1 : n;
+    const mes = MESES[m - 1] + ' ' + y;
+    if (hasta < 1) return 'Todavía no hay días para cargar en ' + mes + ' (hoy es el 1.º).';
+    const prefijo = y + '-' + p2(m) + '-';
+    if (!Array.from(cargadas[y]).some(f => f.startsWith(prefijo))) return 'No hay días cargados en <b>' + mes + '</b>.'; // mes vacío: respuesta corta
+    const falta = [];
+    for (let d = 1; d <= hasta; d++) {
+      const iso = y + '-' + p2(m) + '-' + p2(d);
+      if (!cargadas[y].has(iso)) falta.push(p2(d) + ' (' + DIAS_C[new Date(y, m - 1, d).getDay()] + ')');
+    }
+    if (!falta.length) return '✓ En ' + mes + ' están cargados todos los días' + (delta === 0 ? ' hasta ayer' : '') + '.';
+    return 'En <b>' + mes + '</b> faltan cargar <b>' + falta.length + '</b> día' + (falta.length > 1 ? 's' : '') + (delta === 0 ? ' (hasta ayer)' : '') + ':<br>' + chips(falta);
+  }
+
+  function burbuja(html, quien) {
+    const b = document.createElement('div'); b.className = 'bub ' + quien;
+    quien === 'yo' ? (b.textContent = html) : (b.innerHTML = html);
+    $('chatMsgs').appendChild(b); $('chatMsgs').scrollTop = $('chatMsgs').scrollHeight; return b;
+  }
+  PREGUNTAS.forEach(q => {
+    const b = document.createElement('button'); b.textContent = q.t;
+    b.onclick = async () => {
+      document.querySelectorAll('#chatQs button').forEach(x => x.disabled = true);
+      burbuja(q.t, 'yo'); const espera = burbuja('Consultando…', 'bot');
+      let r; try { r = await q.f(); } catch (e) { r = 'Hubo un error: ' + esc(e.message); }
+      espera.innerHTML = r; $('chatMsgs').scrollTop = $('chatMsgs').scrollHeight;
+      document.querySelectorAll('#chatQs button').forEach(x => x.disabled = false);
+    };
+    $('chatQs').appendChild(b);
+  });
+  burbuja('Hola 👋 Elegí una pregunta:', 'bot');
+  $('chatBtn').addEventListener('click', () => { $('chat').classList.toggle('hide'); });
+  $('chatX').addEventListener('click', () => $('chat').classList.add('hide'));
+
+  function setMsg(id, t, cls) { const el = $(id); el.textContent = t; el.className = 'msg' + (cls ? ' ' + cls : ''); }
+  render(); renderLog();
+  if ($('codigo').value.trim()) cargarFechas(anioActual, false);
+</script>
+</body>
+</html>
