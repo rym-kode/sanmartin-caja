@@ -2,6 +2,7 @@
 // Local: leé .env (copiá .env.example). En el host (Netlify/Vercel/etc.): cargá las variables como secrets.
 const fs = require('fs'), path = require('path');
 
+
 const env = {};
 try { // .env local (opcional): líneas CLAVE=valor
   fs.readFileSync(path.join(__dirname, '.env'), 'utf8').split(/\r?\n/).forEach(l => {
