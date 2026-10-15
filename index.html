@@ -125,6 +125,7 @@
   // Estos dos valores los inyecta `node build.js` desde las variables de entorno (.env local o secrets del host).
   const SCRIPT_URL = '__SCRIPT_URL__';
   const SHEET_URL  = '__SHEET_URL__';
+  const ADMIN = ' Contacte al administrador del sistema.';
   const SCRIPT_OK  = !!SCRIPT_URL && !SCRIPT_URL.startsWith('__'); // false si se abre la plantilla sin hacer el build
 
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -152,7 +153,7 @@
       const j = await r.json();
       if (!j.ok) throw new Error(j.error);
       cargadas[anio] = new Set(j.fechas);
-    } catch (e) { ultimoError = e.message; if (avisar) toast('No pude leer las fechas del Sheet (' + anio + '): ' + e.message); }
+    } catch (e) { ultimoError = e.message; if (avisar) toast('No se pudieron consultar las fechas cargadas de ' + anio + ' (' + e.message + ').' + ADMIN); }
     render();
   }
   $('codigo').addEventListener('change', () => cargarFechas(anioActual, true));
@@ -193,7 +194,7 @@
       if (archivos.some(a => a.key === key)) { toast('“' + f.name + '”: ya está en la lista.'); continue; }
       setMsg('estado', 'Leyendo “' + f.name + '”…');
       const a = { id: ++seq, key, name: f.name, dias: [], control: null, error: null, estado: 'listo', detalle: '' };
-      try { Object.assign(a, await leer(f)); } catch (e) { a.error = e.message; toast('“' + f.name + '”: ' + e.message); }
+      try { Object.assign(a, await leer(f)); } catch (e) { a.error = e.message; toast('No se pudo leer “' + f.name + '”: ' + e.message + '.' + ADMIN); }
       if (!a.error) { // si alguna fecha ya está en otro archivo de la lista, NO se adjunta
         const choques = a.dias.map(d => ({ d, otro: archivos.find(x => !x.error && x.dias.some(y => y.fecha === d.fecha)) })).filter(c => c.otro);
         if (choques.length) {
@@ -308,7 +309,7 @@
   /* ---------- Subida en loop ---------- */
   $('subir').addEventListener('click', async () => {
     const codigo = $('codigo').value.trim();
-    if (!SCRIPT_OK) return toast('Falta configurar SCRIPT_URL (variable de entorno; ver README).');
+    if (!SCRIPT_OK) return toast('El sistema no está configurado correctamente para subir información.' + ADMIN);
     if (!codigo) return toast('Ingresá el código de acceso.');
     // Se revalida justo antes de subir: con fechas repetidas no se sube nada
     const rep = Object.keys(repetidas());
@@ -328,7 +329,7 @@
         ultimaUrl = j.resultado[0].url || ultimaUrl; ok++;
         sesion.push({ archivo: a.name, fechas: a.dias.map(d => d.fecha), ts: Date.now() });
         try { localStorage.setItem('codigo', codigo); } catch (e) {}
-      } catch (e) { a.estado = 'error'; a.detalle = 'Error: ' + e.message; toast('“' + a.name + '”: ' + e.message); }
+      } catch (e) { a.estado = 'error'; a.detalle = 'Error: ' + e.message; toast('No se pudo subir “' + a.name + '”: ' + e.message + '.' + ADMIN); }
       render(); if (cortar) break;
     }
     const anios = new Set(pend.filter(a => a.estado === 'cargado').flatMap(a => a.dias.map(d => Number(d.fecha.slice(0, 4)))));
@@ -337,7 +338,7 @@
     archivos = archivos.filter(a => a.estado !== 'cargado'); // limpia lo ya subido (queda en el historial)
     render();
     const fallos = pend.filter(a => a.estado === 'error').length;
-    if (fallos) toast(fallos + ' archivo' + (fallos > 1 ? 's' : '') + ' con error: quedaron en la lista para que los elimines o reintentes.');
+    if (fallos) toast(fallos + ' archivo' + (fallos > 1 ? 's' : '') + ' con error: quedaron en la lista para que los elimines o reintentes. Si el problema continúa,' + ADMIN.toLowerCase().replace('contacte','contacte'));
     const est = $('estado');
     est.className = 'msg ok';
     est.innerHTML = ok ? '✓ ' + ok + ' archivo' + (ok > 1 ? 's' : '') + ' cargado' + (ok > 1 ? 's' : '') + '. <a href="' + esc(ultimaUrl) + '" target="_blank" rel="noopener">Ver Sheet</a>' : '';
@@ -366,9 +367,9 @@
     const e = ultimoError;
     if (/falta el código/.test(e)) return 'falta ingresar el código de acceso.';
     if (/código de acceso incorrecto/i.test(e)) return 'el código de acceso es incorrecto.';
-    if (/No hay días/.test(e)) return 'el script de Google todavía es la versión vieja: falta pegar la función cargados_ y publicar una versión nueva (Implementar > Administrar implementaciones > Nueva versión).';
-    if (/Failed to fetch|NetworkError|Load failed/i.test(e)) return 'no pude conectar con el script de Google (revisá que la implementación tenga acceso "Cualquier usuario").';
-    return e ? esc(e) : 'error desconocido.';
+    if (/No hay días/.test(e)) return 'el servicio de carga está desactualizado.' + ADMIN;
+    if (/Failed to fetch|NetworkError|Load failed/i.test(e)) return 'no hay conexión con el servicio de carga.' + ADMIN;
+    return (e ? esc(e) : 'error desconocido') + '.' + ADMIN;
   };
   const SIN_SHEET_F = () => 'No pude consultar el Sheet: ' + motivo();
 
@@ -405,7 +406,7 @@
     b.onclick = async () => {
       document.querySelectorAll('#chatQs button').forEach(x => x.disabled = true);
       burbuja(q.t, 'yo'); const espera = burbuja('Consultando…', 'bot');
-      let r; try { r = await q.f(); } catch (e) { r = 'Hubo un error: ' + esc(e.message); }
+      let r; try { r = await q.f(); } catch (e) { r = 'Ocurrió un error: ' + esc(e.message) + '.' + ADMIN; }
       espera.innerHTML = r; $('chatMsgs').scrollTop = $('chatMsgs').scrollHeight;
       document.querySelectorAll('#chatQs button').forEach(x => x.disabled = false);
     };
